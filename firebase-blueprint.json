@@ -1,0 +1,171 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile data",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID"
+        },
+        "name": {
+          "type": "string",
+          "description": "User's full name"
+        },
+        "mobile": {
+          "type": "string",
+          "description": "User's mobile number"
+        },
+        "balance": {
+          "type": "number",
+          "description": "Current wallet balance"
+        },
+        "totalDeposit": {
+          "type": "number",
+          "description": "Total amount deposited"
+        },
+        "totalWithdraw": {
+          "type": "number",
+          "description": "Total amount withdrawn"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Active", "Blocked"],
+          "description": "Account status"
+        },
+        "referralCode": {
+          "type": "string",
+          "description": "User's referral code"
+        },
+        "referredBy": {
+          "type": "string",
+          "description": "Referral code of the user who referred this user"
+        },
+        "referralsToday": {
+          "type": "number",
+          "description": "Number of referrals made today"
+        },
+        "lastReferralDate": {
+          "type": "string",
+          "description": "Date of the last referral"
+        },
+        "isAdult": {
+          "type": "boolean",
+          "description": "Whether the user has confirmed they are 18+"
+        },
+        "bonusGiven": {
+          "type": "boolean",
+          "description": "Whether the signup bonus has been given"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["user", "admin"],
+          "description": "User role"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Account creation timestamp"
+        }
+      },
+      "required": ["uid", "name", "mobile", "balance", "status", "isAdult", "bonusGiven", "role"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "A financial transaction (deposit, withdraw, etc.)",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Transaction ID"
+        },
+        "userId": {
+          "type": "string",
+          "description": "User's UID"
+        },
+        "userName": {
+          "type": "string",
+          "description": "User's name"
+        },
+        "userMobile": {
+          "type": "string",
+          "description": "User's mobile number"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["deposit", "withdraw", "join_contest", "premium_upgrade", "bonus", "referral_bonus"],
+          "description": "Type of transaction"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Transaction amount"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "success", "failed"],
+          "description": "Transaction status"
+        },
+        "description": {
+          "type": "string",
+          "description": "Transaction description"
+        },
+        "date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Transaction timestamp"
+        }
+      },
+      "required": ["id", "userId", "type", "amount", "status", "date"]
+    },
+    "Match": {
+      "title": "Match",
+      "description": "A sports match",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "team1": {
+          "type": "string"
+        },
+        "team2": {
+          "type": "string"
+        },
+        "time": {
+          "type": "string"
+        },
+        "fee": {
+          "type": "number"
+        },
+        "spots": {
+          "type": "number"
+        },
+        "prize": {
+          "type": "number"
+        }
+      },
+      "required": ["id", "team1", "team2", "time", "fee", "spots", "prize"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/User"
+      },
+      "description": "User profiles"
+    },
+    "transactions/{transactionId}": {
+      "schema": {
+        "$ref": "#/entities/Transaction"
+      },
+      "description": "Financial transactions"
+    },
+    "matches/{matchId}": {
+      "schema": {
+        "$ref": "#/entities/Match"
+      },
+      "description": "Matches"
+    }
+  }
+}

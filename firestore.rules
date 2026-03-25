@@ -1,0 +1,174 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId} (matches auth.uid)
+    // Fields:
+    //   - uid: string (required)
+    //   - name: string (required)
+    //   - mobile: string (required)
+    //   - balance: number (required)
+    //   - totalDeposit: number
+    //   - totalWithdraw: number
+    //   - status: string (required, 'Active' | 'Blocked')
+    //   - referralCode: string
+    //   - referredBy: string
+    //   - referralsToday: number
+    //   - lastReferralDate: string
+    //   - isAdult: boolean (required)
+    //   - bonusGiven: boolean (required)
+    //   - role: string (required, 'user' | 'admin')
+    //   - createdAt: string
+    //
+    // Collection: transactions
+    // Document ID: {transactionId}
+    // Fields:
+    //   - id: string (required)
+    //   - userId: string (required)
+    //   - userName: string
+    //   - userMobile: string
+    //   - type: string (required, 'deposit' | 'withdraw' | 'join_contest' | 'premium_upgrade' | 'bonus' | 'referral_bonus')
+    //   - amount: number (required)
+    //   - status: string (required, 'pending' | 'success' | 'failed')
+    //   - description: string
+    //   - date: string (required)
+    //
+    // Collection: matches
+    // Document ID: {matchId}
+    // Fields:
+    //   - id: string (required)
+    //   - team1: string (required)
+    //   - team2: string (required)
+    //   - time: string (required)
+    //   - fee: number (required)
+    //   - spots: number (required)
+    //   - prize: number (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && (
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+        (request.auth.token.email == "mailtoclassactionupdates@gmail.com")
+      );
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+    
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid;
+    }
+    
+    function uidNotModified() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid;
+    }
+    
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+    
+    function isValidUser(data) {
+      return data.uid is string &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.mobile is string && data.mobile.size() >= 10 && data.mobile.size() <= 15 &&
+             data.balance is number && data.balance >= 0 &&
+             data.status in ['Active', 'Blocked'] &&
+             data.isAdult is bool &&
+             data.bonusGiven is bool &&
+             data.role in ['user', 'admin'];
+    }
+    
+    function isValidTransaction(data) {
+      return data.id is string && data.id.size() > 0 && data.id.size() < 100 &&
+             data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
+             data.type in ['deposit', 'withdraw', 'join_contest', 'premium_upgrade', 'bonus', 'referral_bonus'] &&
+             data.amount is number && data.amount > 0 &&
+             data.status in ['pending', 'success', 'failed'] &&
+             data.date is string;
+    }
+    
+    function isValidMatch(data) {
+      return data.id is string && data.id.size() > 0 && data.id.size() < 100 &&
+             data.team1 is string && data.team1.size() > 0 && data.team1.size() < 50 &&
+             data.team2 is string && data.team2.size() > 0 && data.team2.size() < 50 &&
+             data.time is string && data.time.size() > 0 && data.time.size() < 100 &&
+             data.fee is number && data.fee >= 0 &&
+             data.spots is number && data.spots > 0 &&
+             data.prize is number && data.prize >= 0;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      
+      allow create: if isAuthenticated() && 
+                       isOwner(userId) && 
+                       hasRequiredFields(['uid', 'name', 'mobile', 'balance', 'status', 'isAdult', 'bonusGiven', 'role']) &&
+                       isValidUser(request.resource.data) &&
+                       uidUnchanged() &&
+                       ((request.resource.data.role == 'user') || isAdmin());
+                       
+      allow update: if isAuthenticated() && 
+                       isValidUser(request.resource.data) &&
+                       uidNotModified() &&
+                       (
+                         isAdmin() || 
+                         (isOwner(userId) && 
+                          request.resource.data.role == resource.data.role &&
+                          request.resource.data.status == resource.data.status // Users can't unblock themselves
+                         )
+                       );
+                       
+      allow delete: if isAdmin();
+    }
+    
+    match /transactions/{transactionId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      
+      allow create: if isAuthenticated() && 
+                       hasRequiredFields(['id', 'userId', 'type', 'amount', 'status', 'date']) &&
+                       isValidTransaction(request.resource.data) &&
+                       (request.resource.data.userId == request.auth.uid || isAdmin());
+                       
+      allow update: if isAdmin() && isValidTransaction(request.resource.data);
+      
+      allow delete: if isAdmin();
+    }
+    
+    match /matches/{matchId} {
+      allow read: if isAuthenticated();
+      
+      allow create: if isAdmin() && 
+                       hasRequiredFields(['id', 'team1', 'team2', 'time', 'fee', 'spots', 'prize']) &&
+                       isValidMatch(request.resource.data);
+                       
+      allow update: if isAdmin() && isValidMatch(request.resource.data);
+      
+      allow delete: if isAdmin();
+    }
+  }
+}
